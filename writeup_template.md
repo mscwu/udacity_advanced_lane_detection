@@ -120,27 +120,194 @@ You're reading it!
 
 #### 1. Briefly state how you computed the camera matrix and distortion coefficients. Provide an example of a distortion corrected calibration image.
 
-The code for this step is contained in the first code cell of the IPython notebook located in "./examples/example.ipynb" (or in lines # through # of the file called `some_file.py`).  
+The code for this step is contained in the first code cell of the [IPython notebook](https://github.com/mscwu/udacity_advanced_lane_detection/blob/master/advanced_lane_lines.ipynb).
 
 I start by preparing "object points", which will be the (x, y, z) coordinates of the chessboard corners in the world. Here I am assuming the chessboard is fixed on the (x, y) plane at z=0, such that the object points are the same for each calibration image.  Thus, `objp` is just a replicated array of coordinates, and `objpoints` will be appended with a copy of it every time I successfully detect all chessboard corners in a test image.  `imgpoints` will be appended with the (x, y) pixel position of each of the corners in the image plane with each successful chessboard detection.  
 
 I then used the output `objpoints` and `imgpoints` to compute the camera calibration and distortion coefficients using the `cv2.calibrateCamera()` function.  I applied this distortion correction to the test image using the `cv2.undistort()` function and obtained this result: 
 
 ![alt text][image19]
-![alt text][image20]
+
+
 ### Pipeline (single images)
 
 #### 1. Provide an example of a distortion-corrected image.
 
 To demonstrate this step, I will describe how I apply the distortion correction to one of the test images like this one:
-![alt text][image2]
+![alt text][image20]
 
 #### 2. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image (thresholding steps at lines # through # in `another_file.py`).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
+I used a combination of color and gradient thresholds to generate a binary image.  
 
+In order to find the best color selection method, I started with investigating the images in different color space and separate channels. The idea of using color selection to detect lanes is based upon the fact that lanes consist of white and yellow color. However, it has been proven that the most common color space, i.e., RGB space, is not suitable for picking colors when the image is subject to various lighting conditions.  
+
+First I took a look at HSV space.  
+
+![alt text][image1]
+![alt text][image2]
 ![alt text][image3]
+![alt text][image4]
+![alt text][image5]
+![alt text][image6]
 
+Yellow lane appears dark in the H channel and bright in S and V channel. Pay attention to image No.4. Even though part of the yellow lane, close to the bottom of the image, is in the shadow, we can still clearly tell it apart from the road, especially in H and S channel.  
+
+RGB space.  
+![alt text][image13]
+![alt text][image14]
+![alt text][image15]
+![alt text][image16]
+![alt text][image17]
+![alt text][image18]
+
+In fact, RGB color space is doing well for the white lane. However, again, pay attention to image No.4 and 5. The shadow starts to appear among all the channels, covering the yellow lane marking. This is the reason why I decided not to use RGB color space yellow color selection.
+
+HLS space.
+![alt text][image7]
+![alt text][image8]
+![alt text][image9]
+![alt text][image10]
+![alt text][image11]
+![alt text][image12]
+The HLS space shows similar results as HSV space. However, it seems that just by properly thresholding the S channel we can get most of the job done.  
+
+Based on my observation, I decided to use HLS space to choose the yellow lane and the RGB space to pick the white lane.  
+The code to pick the yellow lane is:  
+```
+def pick_yellow(img, lower_yellow, upper_yellow, return_binary=False):
+    # Convert BGR to HLS
+    hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)   
+
+    # Threshold the HLS image to get only yellow colors
+    mask = cv2.inRange(hls, lower_yellow, upper_yellow)
+    # Bitwise-AND mask and original image
+    res = cv2.bitwise_and(img, img, mask= mask)
+    if return_binary:
+        return mask
+    else:
+        return res
+```
+Here are the sample road images with yellow lanes picked.  
+![alt text][image21]
+![alt text][image22]
+![alt text][image23]
+![alt text][image24]
+![alt text][image25]
+![alt text][image26]
+The next step is to pick white lanes. Now, for white lanes, we can just select pixels with high RBG values in the RGB space.  
+```
+def pick_white(img, lower_white, upper_white, return_binary=False):
+    # Threshold the BGR image to get only white colors
+    mask = cv2.inRange(img, lower_white, upper_white)
+    # Bitwise-AND mask and original image
+    res = cv2.bitwise_and(img, img, mask= mask)
+    if return_binary:
+        return mask
+    else:
+        return res
+```
+Here are the sample road images with white lanes picked.
+![alt text][image27]
+![alt text][image28]
+![alt text][image29]
+![alt text][image30]
+![alt text][image31]
+![alt text][image32]
+Next, combine white and yellow lane selection.  
+```
+def pick_white_yellow(img, lower_yellow, upper_yellow, lower_white, upper_white, return_binary=False):
+    white = pick_white(img, lower_white, upper_white, True)
+    yellow = pick_yellow(img, lower_yellow, upper_yellow, True)
+    color_mask = cv2.bitwise_or(white, yellow)
+    res = cv2.bitwise_and(img, img, mask = color_mask)
+    if return_binary:
+        return color_mask
+    else:
+        return res
+```
+Here are the sample road images with yellow and white lanes picked.
+![alt text][image33]
+![alt text][image34]
+![alt text][image35]
+![alt text][image36]
+![alt text][image37]
+![alt text][image38]
+
+In fact, just by properly thresholding the colors, I had successfully isolated most lane markings from the rest of the image. However, I wanted to see if using sobel operator gave me more information from the image.  
+```
+def sobel_x_gradient(img, k_threshold, return_binary=False):
+    r_channel = img[:,:,2]
+    # Sobel x
+    sobelx = cv2.Sobel(r_channel, cv2.CV_64F, 1, 0, ksize=9) # Take the derivative in x
+    abs_sobelx = np.absolute(sobelx) # Absolute x derivative to accentuate lines away from horizontal
+    scaled_sobelx = np.uint8(255*abs_sobelx/np.max(abs_sobelx))
+    # Threshold x gradient
+    sxbinary = np.zeros_like(scaled_sobelx)
+    sxbinary[(scaled_sobelx >= k_threshold[0]) & (scaled_sobelx <= k_threshold[1])] = 1
+    
+    res = cv2.bitwise_and(img, img, mask = sxbinary)
+    if return_binary:
+        return sxbinary
+    else:
+        return res
+```
+![alt text][image39]
+![alt text][image40]
+![alt text][image41]
+![alt text][image42]
+![alt text][image43]
+![alt text][image44]
+
+It seemed that for image 5 particularly, sobel operator gave more information about the lane to us.  
+Now, on top of that, I applied a sobel gradient direction filter.  
+```
+def dir_threshold(img, sobel_kernel=3, thresh=[.7, 1.3]):
+    # Grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    r_channel = img[:,:,2]
+    # Calculate the x and y gradients
+    sobelx = cv2.Sobel(r_channel, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
+    sobely = cv2.Sobel(r_channel, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+    # Take the absolute value of the gradient direction, 
+    # apply a threshold, and create a binary image result
+    absgraddir = np.arctan2(np.absolute(sobely), np.absolute(sobelx))
+    binary_output =  np.zeros_like(absgraddir)
+    binary_output[(absgraddir >= thresh[0]) & (absgraddir <= thresh[1])] = 1
+    # Return the binary image
+    return binary_output
+ ```
+![alt text][image45]
+![alt text][image46]
+![alt text][image47]
+![alt text][image48]
+![alt text][image49]
+![alt text][image50] 
+
+It seemed like gradient direction detector didn't reveal much more information but the lanes were still discernable in the images. It might be a good idea to use "and" operator to combine the gradient magnitude and graident direction filters together.  
+```
+def combined_gradient(img, k_threshold=[20, 255], ang_threshold=[0.9, 1.2], kernel_size=15):
+    sobelx = sobel_x_gradient(img, k_threshold, True)
+    grad_dir = dir_threshold(img, kernel_size, ang_threshold)
+    binary_output =  np.zeros_like(sobelx)
+    binary_output[(sobelx == 1) & (grad_dir == 1)] = 1
+    
+    return binary_output
+```
+![alt text][image51]
+![alt text][image52]
+![alt text][image53]
+![alt text][image54]
+![alt text][image55]
+![alt text][image56]
+There didn't seem to be much more information added but that was what I wanted. I wanted use the color selection as the main detector and use gradient selector as a helper to provide a little bit more information.  
+Now, it is time to combine the color and gradient thresholds and produce the final results.  
+![alt text][image57]
+![alt text][image58]
+![alt text][image59]
+![alt text][image60]
+![alt text][image61]
+![alt text][image62]
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
 The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
