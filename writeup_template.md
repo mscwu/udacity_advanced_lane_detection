@@ -1,4 +1,4 @@
-#Advanced Lane Finding Project**
+# Advanced Lane Finding Project #
 
 The goals / steps of this project are the following:
 
@@ -90,12 +90,12 @@ The goals / steps of this project are the following:
 [image75]: ./output_images/lanes_image4.jpg "Lanes 4"
 [image76]: ./output_images/lanes_image5.jpg "Lanes 5"
 [image77]: ./output_images/lanes_image6.jpg "Lanes 6"
-[image78]: ./output_images/warped_binary_image1.jpg "Warped Binary 1"
-[image79]: ./output_images/warped_binary_image2.jpg "Warped Binary 2"
-[image80]: ./output_images/warped_binary_image3.jpg "Warped Binary 3"
-[image81]: ./output_images/warped_binary_image4.jpg "Warped Binary 4"
-[image82]: ./output_images/warped_binary_image5.jpg "Warped Binary 5"
-[image83]: ./output_images/warped_binary_image6.jpg "Warped Binary 6"
+[image78]: ./output_images/warped_binary_road_image1.jpg "Warped Binary 1"
+[image79]: ./output_images/warped_binary_road_image2.jpg "Warped Binary 2"
+[image80]: ./output_images/warped_binary_vimage3.jpg "Warped Binary 3"
+[image81]: ./output_images/warped_binary_road_image4.jpg "Warped Binary 4"
+[image82]: ./output_images/warped_binary_road_image5.jpg "Warped Binary 5"
+[image83]: ./output_images/warped_binary_road_image6.jpg "Warped Binary 6"
 [video1]: ./project_video.mp4 "Video"
 
 ---
