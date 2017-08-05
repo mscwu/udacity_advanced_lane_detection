@@ -174,7 +174,7 @@ The HLS space shows similar results as HSV space. However, it seems that just by
 
 Based on my observation, I decided to use HLS space to choose the yellow lane and the RGB space to pick the white lane.  
 The code to pick the yellow lane is:  
-```
+```python
 def pick_yellow(img, lower_yellow, upper_yellow, return_binary=False):
     # Convert BGR to HLS
     hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)   
@@ -196,7 +196,7 @@ Here are the sample road images with yellow lanes picked.
 ![alt text][image25]
 ![alt text][image26]
 The next step is to pick white lanes. Now, for white lanes, we can just select pixels with high RBG values in the RGB space.  
-```
+```python
 def pick_white(img, lower_white, upper_white, return_binary=False):
     # Threshold the BGR image to get only white colors
     mask = cv2.inRange(img, lower_white, upper_white)
@@ -215,7 +215,7 @@ Here are the sample road images with white lanes picked.
 ![alt text][image31]
 ![alt text][image32]
 Next, combine white and yellow lane selection.  
-```
+```python
 def pick_white_yellow(img, lower_yellow, upper_yellow, lower_white, upper_white, return_binary=False):
     white = pick_white(img, lower_white, upper_white, True)
     yellow = pick_yellow(img, lower_yellow, upper_yellow, True)
@@ -235,7 +235,7 @@ Here are the sample road images with yellow and white lanes picked.
 ![alt text][image38]
 
 In fact, just by properly thresholding the colors, I had successfully isolated most lane markings from the rest of the image. However, I wanted to see if using sobel operator gave me more information from the image.  
-```
+```python
 def sobel_x_gradient(img, k_threshold, return_binary=False):
     r_channel = img[:,:,2]
     # Sobel x
@@ -261,7 +261,7 @@ def sobel_x_gradient(img, k_threshold, return_binary=False):
 
 It seemed that for image 5 particularly, sobel operator gave more information about the lane to us.  
 Now, on top of that, I applied a sobel gradient direction filter.  
-```
+```python
 def dir_threshold(img, sobel_kernel=3, thresh=[.7, 1.3]):
     # Grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
@@ -285,7 +285,7 @@ def dir_threshold(img, sobel_kernel=3, thresh=[.7, 1.3]):
 ![alt text][image50] 
 
 It seemed like gradient direction detector didn't reveal much more information but the lanes were still discernable in the images. It might be a good idea to use "and" operator to combine the gradient magnitude and graident direction filters together.  
-```
+```python
 def combined_gradient(img, k_threshold=[20, 255], ang_threshold=[0.9, 1.2], kernel_size=15):
     sobelx = sobel_x_gradient(img, k_threshold, True)
     grad_dir = dir_threshold(img, kernel_size, ang_threshold)
@@ -310,57 +310,272 @@ Now, it is time to combine the color and gradient thresholds and produce the fin
 ![alt text][image62]
 #### 3. Describe how (and identify where in your code) you performed a perspective transform and provide an example of a transformed image.
 
-The code for my perspective transform includes a function called `warper()`, which appears in lines 1 through 8 in the file `example.py` (output_images/examples/example.py) (or, for example, in the 3rd code cell of the IPython notebook).  The `warper()` function takes as inputs an image (`img`), as well as source (`src`) and destination (`dst`) points.  I chose the hardcode the source and destination points in the following manner:
+The code for my perspective transform includes a function called `warp()`.  The `warp()` function takes as input an image (`img`).  I chose the hardcode the source and destination points in the following manner:
 
 ```python
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
+v1 = (187, img.shape[0])
+v2 = (591, 450)
+v3 = (688, 450)
+v4 = (1122, img.shape[0])
+# define a function to warp the image to change perspective to birds eye view
+def warp(img):
+    '''Compute perspective transformation M and its inverse and a warped image
+    
+    Keyword arguments:
+    img -- input image
+    '''
+    img = np.copy(img)
+    img_size = (img.shape[1], img.shape[0])
+    # source points
+    src = np.float32([v1, v2, v3, v4])
+    # desination points
+    dst = np.float32([[450, img.shape[0]], [450, 0], [img.shape[1]-450, 0], [img.shape[1]-450, img.shape[0]]])
+    # get transformation matrix M
+    M = cv2.getPerspectiveTransform(src, dst)
+    # get inverse transformation matrix invM
+    invM = cv2.getPerspectiveTransform(dst, src)
+    # create warped image
+    warped = cv2.warpPerspective(img, M, img_size, flags=cv2.INTER_LINEAR)
+    return (M, invM, warped)
 ```
-
-This resulted in the following source and destination points:
-
-| Source        | Destination   | 
-|:-------------:|:-------------:| 
-| 585, 460      | 320, 0        | 
-| 203, 720      | 320, 720      |
-| 1127, 720     | 960, 720      |
-| 695, 460      | 960, 0        |
 
 I verified that my perspective transform was working as expected by drawing the `src` and `dst` points onto a test image and its warped counterpart to verify that the lines appear parallel in the warped image.
 
-![alt text][image4]
+![alt text][image63]
+![alt text][image64]
+
+I also drew the vertices on another image with curved lanes.
+![alt text][image65]
+
+Now that we can both create binary images and warped images, they can be combined into the pipeline.  
+![alt text][image78]
+![alt text][image79]
+![alt text][image80]
+![alt text][image81]
+![alt text][image82]
+![alt text][image83] 
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+To find lanes and fit a polynomial, I used a method called sliding window search.  
+This method contains following steps:  
+    1.  Create a histogram of the bottom half of the image. Possible lanes will show up with high histogram values.  
+    2.  Find the peak points of left and right image plane separately and use them as the starting point of the search.  
+    3.  Divide the image from bottom up into a number of slices and create windows of width "margin" that slides left and right with in each slice.  
+    4.  For each slice of image, if the number of nonzero pixels included in the window is higher than a threshold, the window is recentered and the centroid is added to a list that keeps track of all the centroids. This step is iterated from bottom of the image to the top of the image.  
+    5.  When all the centroids have been collected, a second order polynomial fit is created.  
+The code is as follows.  
+```python
+# define a sliding window function to find lanes
+def sliding_window_search(binary_warped, nwindows, margin, minpix, visualize = False):
+    '''Find lanes in a binary warped image
+    
+    Keyword arguments:
+    binary_warped -- input binary image and already warped into top view
+    nwindows -- number of sliding windows
+    margin -- width of windows, +/- margin
+    minpix -- minimum number of pixels found to recenter the window
+    visualize -- boolean value to turn on visualization, for testing only
+    '''
+    # Take a histogram of the bottom half of the image
+    histogram = np.sum(binary_warped[int(binary_warped.shape[0]/2):,:], axis=0)
+    # Create an output image to draw on and  visualize the result
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
+    # Find the peak of the left and right halves of the histogram
+    # These will be the starting point for the left and right lines
+    midpoint = np.int(histogram.shape[0]/2)
+    leftx_base = np.argmax(histogram[:midpoint])
+    rightx_base = np.argmax(histogram[midpoint:]) + midpoint
 
-![alt text][image5]
+    # Choose the number of sliding windows
+    #nwindows = 12
+    # Set height of windows
+    window_height = np.int(binary_warped.shape[0]/nwindows)
+    # Identify the x and y positions of all nonzero pixels in the image
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    # Current positions to be updated for each window
+    leftx_current = leftx_base
+    rightx_current = rightx_base
+    # Set the width of the windows +/- margin
+    #margin = 100
+    # Set minimum number of pixels found to recenter window
+    #minpix = 5
+    # Create empty lists to receive left and right lane pixel indices
+    left_lane_inds = []
+    right_lane_inds = []
+
+    # Step through the windows one by one
+    for window in range(nwindows):
+        # Identify window boundaries in x and y (and right and left)
+        win_y_low = binary_warped.shape[0] - (window+1)*window_height
+        win_y_high = binary_warped.shape[0] - window*window_height
+        win_xleft_low = leftx_current - margin
+        win_xleft_high = leftx_current + margin
+        win_xright_low = rightx_current - margin
+        win_xright_high = rightx_current + margin
+        if visualize:
+            # Draw the windows on the visualization image
+            cv2.rectangle(out_img,(win_xleft_low,win_y_low),(win_xleft_high,win_y_high),(0,255,0), 2) 
+            cv2.rectangle(out_img,(win_xright_low,win_y_low),(win_xright_high,win_y_high),(0,255,0), 2) 
+        # Identify the nonzero pixels in x and y within the window
+        good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xleft_low) & (nonzerox < win_xleft_high)).nonzero()[0]
+        good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & (nonzerox >= win_xright_low) & (nonzerox < win_xright_high)).nonzero()[0]
+        # Append these indices to the lists
+        left_lane_inds.append(good_left_inds)
+        right_lane_inds.append(good_right_inds)
+        # If you found > minpix pixels, recenter next window on their mean position
+        if len(good_left_inds) > minpix:
+            leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
+        if len(good_right_inds) > minpix:        
+            rightx_current = np.int(np.mean(nonzerox[good_right_inds]))
+
+    # Concatenate the arrays of indices
+    left_lane_inds = np.concatenate(left_lane_inds)
+    right_lane_inds = np.concatenate(right_lane_inds)
+
+    # Extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds] 
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds] 
+
+    # Fit a second order polynomial to each
+    right_fit = np.polyfit(righty, rightx, 2)
+    left_fit = np.polyfit(lefty, leftx, 2)
+    
+    
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+    left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+    right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+    if visualize: 
+        plt.imshow(out_img)
+        plt.plot(left_fitx, ploty, color='yellow')
+        plt.plot(right_fitx, ploty, color='yellow')
+        plt.xlim(0, 1280)
+        plt.ylim(720, 0)
+        
+    return ploty, left_fitx, right_fitx, out_img, lefty, leftx, righty, rightx
+```
+The final results are shown below, along with lanes warped back on to the original image.  
+![alt text][image72]
+![alt text][image73]
+![alt text][image74]
+![alt text][image75]
+![alt text][image76]
+![alt text][image77] 
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+Here is the code I used.  
+```python
+def process_lane_data(lane, img_shape, verbose=False):
+    """Process left and right lane fitted data from binary image
+    
+    Return radius of curvature, offset from lane center, derivative of lanes at bottom max y
+    
+    keyword arguments:
+    lane -- [ploty, left_fitx, right_fitx]
+    img_shape -- [height, width]
+    verbose -- debug control
+    
+    """
+    ploty = lane[0]
+    left_fitx = lane[1]
+    right_fitx = lane[2]
+    # evaluate curvature at the bottom of the image
+    y_eval = np.max(ploty)
+    ym_per_pix = 30/720 # meters per pixel in y dimension
+    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+
+    # Fit new polynomials to x,y in world space
+    left_fit_cr = np.polyfit(ploty*ym_per_pix, left_fitx*xm_per_pix, 2)
+    right_fit_cr = np.polyfit(ploty*ym_per_pix, right_fitx*xm_per_pix, 2)
+    
+    # Calculate derivatives for parallelism check
+    left_dot = 2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1]  
+    right_dot = 2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1]
+    
+    # Calculate the new radii of curvature in meters
+    left_curverad = ((1 + left_dot**2)**1.5) / np.absolute(2*left_fit_cr[0])
+    right_curverad = ((1 + right_dot**2)**1.5) / np.absolute(2*right_fit_cr[0])
+
+    # Compute left and right lane at bottom of image
+    left_bot_x = left_fitx[np.argmax(ploty)]
+    right_bot_x = right_fitx[np.argmax(ploty)]
+    
+    # Compute lane center
+    lane_center = (right_bot_x + left_bot_x) / 2
+    # Compute camera location, assuming camera is mounted at center of vehicle
+    camera_x = img_shape[1] / 2
+    # Compute lateral offset, if offset > 0, vehicle deviates to the right, otherwise deviates to the left
+    offset = camera_x - lane_center
+    # Convert to real world unit
+    offset = offset*xm_per_pix
+    
+    # Print for debugging
+    if verbose:
+        print("Left Lane Radius: {0:.2f} m, Right Lane Radius: {1:.2f} m" .format(left_curverad, right_curverad))
+        if offset < 0:
+            print("Offset: {:.2f} m left".format(offset))
+        else:
+            print("Offset: {:.2f} m right".format(offset))
+    
+    return left_curverad, right_curverad, left_dot, right_dot, offset
+ ```
+The funciton `process_lane_data()` takes as input the lane data, image input and a verbose boolean for debuging. The first step is to proper scale the lane data from image space to world space. A decent estimation of lane width and length is required for good calculation of radius of curvature. Then a new polynomial fit is created. The radius of curvature is calculated based on the mathematical definition of radius of curvature of a curve.  
+To calculate the offset, it was asssumed that the camera was installed at the center of the car and thus, the mid point of the image was where the car was centered. The lane center was defined as the center of left and right lane at the bottom of the image. Then the offset would be the difference between these two values.  
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+The image has been shown in previous sections.
 
-![alt text][image6]
-
+#### 7. Validation of detected lanes.
+It is important to validate the detected lanes. Even though I have tried to tune the parameters to make a robust algorithm, it was not guaranteed that detection would be successful for every frame. When a bad detection happens, the program should be able to tell and take measures accordingly.  
+```python
+# define a function to validate newly detected lanes
+def lane_validated(ploty, left_fitx, right_fitx, left_curverad, right_curverad, left_dot, right_dot, verbose=False):
+    flag = True
+    # check radius of curvature
+    if left_curverad / right_curverad > 2 or left_curverad / right_curverad < 0.5:
+        flag = False
+        if verbose:
+            print("Radius ratio", left_curverad / right_curverad)
+            print("Radius check failed")
+        return flag
+    # check lane width, 300 pixels < lane width < 400 pixels
+    left_bot_x = left_fitx[np.argmax(ploty)]
+    right_bot_x = right_fitx[np.argmax(ploty)]
+    if right_bot_x - left_bot_x > 400 or right_bot_x - left_bot_x < 300:
+        flag = False
+        if verbose:
+            print("Lane width", right_bot_x - left_bot_x, "pixels")
+            print("Lane width check failed")
+        return flag
+    # check parallelism
+    if np.absolute(left_dot / right_dot) > 10 or np.absolute(left_dot / right_dot) < 0.1:    
+        flag = False
+        if verbose:
+            print("Derivative ratio", left_dot / right_dot)
+            print("Parallelism check failed")
+        return flag
+    return flag
+```
+The code above shows how I checked the validation of detection. There are three conditions to meet:  
+    1.  The radius of left and right lanes should be close. I used a threshold of 2 times.
+    2.  The width of the lanes must be within a specific range.
+    3.  The lanes should be approximately parallel to each other. I checked the first order derivative of the equation.
 ---
 
 ### Pipeline (video)
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](https://youtu.be/rP_rDzRg_pc)
 
 ---
 
