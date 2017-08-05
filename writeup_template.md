@@ -92,7 +92,7 @@ The goals / steps of this project are the following:
 [image77]: ./output_images/lanes_image6.jpg "Lanes 6"
 [image78]: ./output_images/warped_binary_road_image1.jpg "Warped Binary 1"
 [image79]: ./output_images/warped_binary_road_image2.jpg "Warped Binary 2"
-[image80]: ./output_images/warped_binary_vimage3.jpg "Warped Binary 3"
+[image80]: ./output_images/warped_binary_road_image3.jpg "Warped Binary 3"
 [image81]: ./output_images/warped_binary_road_image4.jpg "Warped Binary 4"
 [image82]: ./output_images/warped_binary_road_image5.jpg "Warped Binary 5"
 [image83]: ./output_images/warped_binary_road_image6.jpg "Warped Binary 6"
@@ -556,9 +556,9 @@ def lane_validated(ploty, left_fitx, right_fitx, left_curverad, right_curverad, 
     return flag
 ```
 The code above shows how I checked the validation of detection. There are three conditions to meet:  
-    1.  The radius of left and right lanes should be close. I used a threshold of 2 times.
-    2.  The width of the lanes must be within a specific range.
-    3.  The lanes should be approximately parallel to each other. I checked the first order derivative of the equation.
+1.  The radius of left and right lanes should be close. I used a threshold of 2 times.
+2.  The width of the lanes must be within a specific range.
+3.  The lanes should be approximately parallel to each other. I checked the first order derivative of the equation.
 ---
 
 ### Pipeline (video)
